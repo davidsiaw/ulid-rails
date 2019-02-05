@@ -14,13 +14,30 @@ module ULID
       end
 
       def cast(value)
-        if value.is_a?(Data)
-          @formatter.format(value.to_s)
-        elsif value&.encoding == Encoding::ASCII_8BIT
-          @formatter.format(value.unpack("H*")[0])
+        if defined?(ActiveRecord::ConnectionAdapters::PostgreSQLAdapter) &&
+              ActiveRecord::Base.connection.instance_of?(
+                ActiveRecord::ConnectionAdapters::PostgreSQLAdapter
+              )
+
+          if value.is_a?(Data)
+            Base32::Crockford.encode(value.to_s.unpack('H*')[0].to_i(16))
+          elsif value&.encoding == Encoding::UTF_8 && value.include?('-')
+            Base32::Crockford.encode(value.delete('-').to_i(16))
+          elsif value&.encoding == Encoding::UTF_8
+            value
+          else
+            super
+          end
         else
-          super
+          if value.is_a?(Data)
+            @formatter.format(value.to_s)
+          elsif value&.encoding == Encoding::ASCII_8BIT
+            @formatter.format(value.unpack("H*")[0])
+          else
+            super
+          end
         end
+
       end
 
       def serialize(value)
